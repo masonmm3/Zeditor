@@ -22,6 +22,10 @@ pub fn build(b: *std.Build) !void {
 
     exe.root_module.addImport("dvui", dvui_dep.module("dvui_raylib"));
 
+    if (target.result.os.tag == .windows and b.release_mode == .any) {
+        exe.subsystem = .Windows;
+    }
+
     const compile_step = b.step("compile", "Compile " ++ name);
     compile_step.dependOn(&b.addInstallArtifact(exe, .{}).step);
     b.getInstallStep().dependOn(compile_step);
