@@ -21,6 +21,7 @@ var text_entry_buf = std.mem.zeroes([50]u8);
 
 const inputState = struct {
     load: bool = false,
+    save: bool = false,
 
     newLine: bool = false,
 };
@@ -78,13 +79,19 @@ fn dvui_frame(state: *inputState) !void {
 
     for (evts) |*e| {
         if (e.evt == .key) {
-            if ((e.evt.key.mod.control() or e.evt.key.mod.command())) {
+            if (e.evt.key.action == .down and (e.evt.key.mod.control() or e.evt.key.mod.command())) {
                 if (e.evt.key.code == .o) {
                     state.load = true;
+                } else if (e.evt.key.code == .s) {
+                    state.save = true;
                 }
             } else if (e.evt.key.action == .down and e.evt.key.code == .enter) {
                 state.newLine = true;
             }
+        }
+
+        if (e.evt.key.action == .down) {
+            //TODO: varriable length buffer size
         }
     }
 
@@ -117,8 +124,22 @@ fn dvui_frame(state: *inputState) !void {
     if (state.load == true) {
         state.load = false;
         text.textSet("words", false);
+    } else if (state.save) {
+        state.save = false;
+        try save(text.text);
+        state.save = false;
     } else if (state.newLine) {
         state.newLine = false;
         text.textTyped("\n", false);
+    }
+}
+
+fn save(words: []u8) !void {
+    const fileName = try dvui.dialogNativeFileSave(gpa, .{});
+
+    if (fileName) |fname| {
+        var file = try std.fs.createFileAbsolute(fname, .{});
+        defer file.close();
+        try file.writeAll(words);
     }
 }
