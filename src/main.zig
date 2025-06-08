@@ -17,7 +17,10 @@ var show_dialog_outside_frame: bool = false;
 
 pub const c = RaylibBackend.c;
 
-var text_entry_buf = std.mem.zeroes([50]u8);
+// var text_entry_buf = std.mem.zeroes([50]u8);
+var text_entry_buf = std.ArrayList(u8).init(gpa);
+
+var startSize: usize = 10;
 
 const inputState = struct {
     load: bool = false,
@@ -28,6 +31,11 @@ const inputState = struct {
 
 pub fn main() !void {
     defer _ = gpa_instance.deinit();
+    defer text_entry_buf.deinit();
+
+    try text_entry_buf.resize(startSize);
+
+    setZero(text_entry_buf.items);
 
     var backend = try RaylibBackend.initWindow(.{
         .gpa = gpa,
@@ -44,6 +52,8 @@ pub fn main() !void {
 
     var input = inputState{
         .load = false,
+        .save = false,
+        .newLine = false,
     };
 
     main_loop: while (true) {
@@ -71,6 +81,12 @@ pub fn main() !void {
     }
 }
 
+fn setZero(list: []u8) void {
+    for (list) |*e| {
+        e.* = 0;
+    }
+}
+
 fn dvui_frame(state: *inputState) !void {
     var scroll = try dvui.scrollArea(@src(), .{}, .{ .expand = .both, .color_fill = .fill_window });
     defer scroll.deinit();
@@ -88,10 +104,12 @@ fn dvui_frame(state: *inputState) !void {
             } else if (e.evt.key.action == .down and e.evt.key.code == .enter) {
                 state.newLine = true;
             }
-        }
 
-        if (e.evt.key.action == .down) {
-            //TODO: varriable length buffer size
+            if (e.evt.key.action == .down) {
+                //TODO: varriable length buffer size
+                startSize += 1;
+                try text_entry_buf.resize(startSize);
+            }
         }
     }
 
@@ -118,7 +136,7 @@ fn dvui_frame(state: *inputState) !void {
         }
     }
 
-    var text = try dvui.textEntry(@src(), .{ .text = .{ .buffer = &text_entry_buf } }, .{ .expand = .both });
+    var text = try dvui.textEntry(@src(), .{ .text = .{ .buffer = text_entry_buf.items } }, .{ .expand = .both });
     defer text.deinit();
 
     if (state.load == true) {
