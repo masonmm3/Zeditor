@@ -9,7 +9,7 @@ pub fn build(b: *std.Build) !void {
 
     const dvui_dep = b.dependency("dvui", .{ .target = target, .optimize = optimize, .backend = .raylib });
 
-    const name = "raylib-app";
+    const name = "Zeditor";
 
     const file = b.path("src/main.zig");
 

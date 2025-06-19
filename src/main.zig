@@ -41,7 +41,7 @@ pub fn main() !void {
         .gpa = gpa,
         .size = .{ .w = 800.0, .h = 600.0 },
         .vsync = vsync,
-        .title = "DVUI Raylib Standalone Example",
+        .title = "Zeditor",
         .icon = window_icon_png, // can also call setIconFromFileContent()
     });
     defer backend.deinit();
