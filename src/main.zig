@@ -31,7 +31,7 @@ const inputState = struct {
 
 pub fn main() !void {
     defer _ = gpa_instance.deinit();
-    defer text_entry_buf.deinit();
+    defer _ = text_entry_buf.deinit();
 
     try text_entry_buf.resize(startSize);
 
@@ -101,7 +101,7 @@ fn dvui_frame(state: *inputState) !void {
                 } else if (e.evt.key.code == .s) {
                     state.save = true;
                 }
-            } else if (e.evt.key.action == .down and e.evt.key.code == .enter) {
+            } else if (e.evt.key.action == .down and (e.evt.key.code == .enter or e.evt.key.code == .kp_enter)) {
                 state.newLine = true;
             }
 
@@ -121,18 +121,15 @@ fn dvui_frame(state: *inputState) !void {
             var fw = try dvui.floatingMenu(@src(), .{ .from = r }, .{});
             defer fw.deinit();
 
-            if (try dvui.menuItemLabel(@src(), "Close Menu", .{}, .{}) != null) {
+            if (try dvui.menuItemLabel(@src(), "Save", .{}, .{}) != null) {
+                m.close();
+                state.save = true;
+            }
+
+            if (try dvui.menuItemLabel(@src(), "Open", .{}, .{}) != null) {
                 m.close();
                 state.load = true;
             }
-        }
-
-        if (try dvui.menuItemLabel(@src(), "Edit", .{ .submenu = true }, .{ .expand = .none })) |r| {
-            var fw = try dvui.floatingMenu(@src(), .{ .from = r }, .{});
-            defer fw.deinit();
-            _ = try dvui.menuItemLabel(@src(), "Dummy", .{}, .{ .expand = .horizontal });
-            _ = try dvui.menuItemLabel(@src(), "Dummy Long", .{}, .{ .expand = .horizontal });
-            _ = try dvui.menuItemLabel(@src(), "Dummy Super Long", .{}, .{ .expand = .horizontal });
         }
     }
 
@@ -141,11 +138,10 @@ fn dvui_frame(state: *inputState) !void {
 
     if (state.load == true) {
         state.load = false;
-        text.textSet("words", false);
+        try open();
     } else if (state.save) {
         state.save = false;
         try save(text.text);
-        state.save = false;
     } else if (state.newLine) {
         state.newLine = false;
         text.textTyped("\n", false);
@@ -153,11 +149,25 @@ fn dvui_frame(state: *inputState) !void {
 }
 
 fn save(words: []u8) !void {
+    _ = words;
     const fileName = try dvui.dialogNativeFileSave(gpa, .{});
 
     if (fileName) |fname| {
         var file = try std.fs.createFileAbsolute(fname, .{});
         defer file.close();
-        try file.writeAll(words);
+        try file.writeAll(text_entry_buf.items);
+    }
+}
+
+fn open() !void {
+    const fileName = try dvui.dialogNativeFileOpen(gpa, .{ .path = "*.txt" });
+    if (fileName) |fname| {
+        const file = try std.fs.openFileAbsolute(fname, .{ .mode = .read_only });
+        defer file.close();
+        const size = try file.getEndPos();
+        _ = try text_entry_buf.resize(size);
+        const bytes = try file.readAll(text_entry_buf.items);
+        _ = try text_entry_buf.resize(bytes);
+        startSize = text_entry_buf.items.len;
     }
 }
