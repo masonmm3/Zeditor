@@ -3,7 +3,7 @@ const Pkg = std.Build.Pkg;
 const Compile = std.Build.Step.Compile;
 
 pub fn build(b: *std.Build) !void {
-    const target = b.standardTargetOptions(.{});
+    const target = b.standardTargetOptions(.{ .default_target = .{ .os_tag = .windows } });
 
     const optimize = b.standardOptimizeOption(.{});
 
@@ -20,11 +20,9 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    exe.root_module.addImport("dvui", dvui_dep.module("dvui_raylib"));
+    exe.subsystem = .Windows;
 
-    if (target.result.os.tag == .windows and b.release_mode == .any) {
-        exe.subsystem = .Windows;
-    }
+    exe.root_module.addImport("dvui", dvui_dep.module("dvui_raylib"));
 
     const compile_step = b.step("compile", "Compile " ++ name);
     compile_step.dependOn(&b.addInstallArtifact(exe, .{}).step);
