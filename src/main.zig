@@ -24,7 +24,7 @@ var openFileName: ?[]const u8 = null;
 const inputState = struct {
     load: bool = false,
     save: bool = false,
-
+    saveAs: bool = false,
     newLine: bool = false,
 };
 //
@@ -156,6 +156,11 @@ fn runToolBar(state: *inputState) void {
             m.close();
             state.load = true;
         }
+
+        if (dvui.menuItemLabel(@src(), "Save As", .{}, .{}) != null) {
+            m.close();
+            state.saveAs = true;
+        }
     }
 }
 
@@ -163,16 +168,35 @@ fn runToolBar(state: *inputState) void {
 
 ///Runs the current event state actions
 fn runEvents(state: *inputState, text: *dvui.TextEntryWidget) !void {
-    if (state.load == true) {
-        state.load = false;
-        try open();
-    } else if (state.save) {
-        state.save = false;
-        try quickSave();
-    } else if (state.newLine) {
-        state.newLine = false;
+    try fileEvents(state);
+    typingEvents(state, text);
+
+    clearInputState(state);
+}
+
+///handles typing related events such as enter and ctrl Z
+fn typingEvents(state: *inputState, text: *dvui.TextEntryWidget) void {
+    if (state.newLine) {
         text.textTyped("\n", false);
     }
+}
+
+///handles events related to saving and opening files
+fn fileEvents(state: *inputState) !void {
+    if (state.load == true) {
+        try open();
+    } else if (state.save) {
+        try quickSave();
+    } else if (state.saveAs) {
+        try saveAs();
+    }
+}
+
+fn clearInputState(state: *inputState) void {
+    state.load = false;
+    state.save = false;
+    state.saveAs = false;
+    state.newLine = false;
 }
 
 ///determines what events have occurred this frame
