@@ -14,10 +14,12 @@ var scale_val: f32 = 1.0;
 
 var show_dialog_outside_frame: bool = false;
 
-// var text_entry_buf = std.mem.zeroes([50]u8);
+//Custom Globally scoped values
 var text_entry_buf: std.ArrayList(u8) = .empty;
 
 var startSize: usize = 1;
+
+var openFileName: ?[]const u8 = null;
 
 const inputState = struct {
     load: bool = false,
@@ -25,6 +27,7 @@ const inputState = struct {
 
     newLine: bool = false,
 };
+//
 
 pub fn main() !void {
     try text_entry_buf.resize(gpa, startSize);
@@ -118,6 +121,8 @@ fn setZero(list: []u8) void {
     }
 }
 
+//UI Functions
+///Main Frame Function
 fn ZeditorFrame(state: *inputState) !bool {
     var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
     defer scroll.deinit();
@@ -133,6 +138,7 @@ fn ZeditorFrame(state: *inputState) !bool {
     return !close;
 }
 
+///Runs the toolbar at the top of the window
 fn runToolBar(state: *inputState) void {
     var m = dvui.menu(@src(), .horizontal, .{ .style = .window, .background = true, .expand = .horizontal });
     defer m.deinit();
@@ -152,18 +158,24 @@ fn runToolBar(state: *inputState) void {
         }
     }
 }
+
+//UI Sub Action Functions
+
+///Runs the current event state actions
 fn runEvents(state: *inputState, text: *dvui.TextEntryWidget) !void {
     if (state.load == true) {
         state.load = false;
         try open();
     } else if (state.save) {
         state.save = false;
-        try save(text.text);
+        try quickSave();
     } else if (state.newLine) {
         state.newLine = false;
         text.textTyped("\n", false);
     }
 }
+
+///determines what events have occurred this frame
 fn poolEvents(state: *inputState) !bool {
     const events = dvui.events();
 
@@ -193,10 +205,28 @@ fn poolEvents(state: *inputState) !bool {
     return shouldClose;
 }
 
-fn save(words: []u8) !void {
-    _ = words;
+// Event Functions
+
+///Attempts to save the current file name before asking for a location
+fn quickSave() !void {
+    if (openFileName) |fname| {
+        try save(fname);
+    } else {
+        try saveAs();
+    }
+}
+
+///Saves the current file, always asks for location
+fn saveAs() !void {
     const fileName = try dvui.dialogNativeFileSave(gpa, .{});
 
+    try save(fileName);
+
+    openFileName = fileName;
+}
+
+///Saves the current File
+fn save(fileName: ?[]const u8) !void {
     if (fileName) |fname| {
         var file = try std.fs.createFileAbsolute(fname, .{});
         defer file.close();
@@ -204,6 +234,7 @@ fn save(words: []u8) !void {
     }
 }
 
+///Opens a file into the editor
 fn open() !void {
     const fileName = try dvui.dialogNativeFileOpen(gpa, .{ .path = "*.txt" });
     if (fileName) |fname| {
@@ -214,5 +245,6 @@ fn open() !void {
         const bytes = try file.readAll(text_entry_buf.items);
         _ = try text_entry_buf.resize(gpa, bytes);
         startSize = text_entry_buf.items.len;
+        openFileName = fname;
     }
 }
