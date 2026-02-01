@@ -26,6 +26,7 @@ const inputState = struct {
     save: bool = false,
     saveAs: bool = false,
     newLine: bool = false,
+    undo: bool = false,
 };
 //
 
@@ -48,7 +49,7 @@ pub fn main() !void {
         .size = .{ .w = 800.0, .h = 600.0 },
         .min_size = .{ .w = 250.0, .h = 350.0 },
         .vsync = vsync,
-        .title = "DVUI SDL3GPU Standalone Example",
+        .title = " Zeditor - A Simple Text Editor",
         .icon = window_icon_png,
     });
 
@@ -143,23 +144,33 @@ fn runToolBar(state: *inputState) void {
     var m = dvui.menu(@src(), .horizontal, .{ .style = .window, .background = true, .expand = .horizontal });
     defer m.deinit();
 
-    if (dvui.menuItemLabel(@src(), "File", .{ .submenu = true }, .{ .expand = .none })) |r| {
-        var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
+    if (dvui.menuItemLabel(@src(), "File", .{ .submenu = true }, .{ .style = .window, .expand = .none })) |f| {
+        var fw = dvui.floatingMenu(@src(), .{ .from = f }, .{ .style = .window });
         defer fw.deinit();
 
-        if (dvui.menuItemLabel(@src(), "Save", .{}, .{}) != null) {
+        if (dvui.menuItemLabel(@src(), "Save", .{}, .{ .style = .window }) != null) {
             m.close();
             state.save = true;
         }
 
-        if (dvui.menuItemLabel(@src(), "Open", .{}, .{}) != null) {
+        if (dvui.menuItemLabel(@src(), "Open", .{}, .{ .style = .window }) != null) {
             m.close();
             state.load = true;
         }
 
-        if (dvui.menuItemLabel(@src(), "Save As", .{}, .{}) != null) {
+        if (dvui.menuItemLabel(@src(), "Save As", .{}, .{ .style = .window }) != null) {
             m.close();
             state.saveAs = true;
+        }
+    }
+
+    if (dvui.menuItemLabel(@src(), "Edit", .{ .submenu = true }, .{ .style = .window, .expand = .none })) |e| {
+        var ew = dvui.floatingMenu(@src(), .{ .from = e }, .{ .style = .window });
+        defer ew.deinit();
+
+        if (dvui.menuItemLabel(@src(), "Undo", .{}, .{ .style = .window }) != null) {
+            m.close();
+            state.undo = true;
         }
     }
 }
@@ -169,15 +180,36 @@ fn runToolBar(state: *inputState) void {
 ///Runs the current event state actions
 fn runEvents(state: *inputState, text: *dvui.TextEntryWidget) !void {
     try fileEvents(state);
-    typingEvents(state, text);
+    try typingEvents(state, text);
 
     clearInputState(state);
 }
 
 ///handles typing related events such as enter and ctrl Z
-fn typingEvents(state: *inputState, text: *dvui.TextEntryWidget) void {
+fn typingEvents(state: *inputState, text: *dvui.TextEntryWidget) !void {
     if (state.newLine) {
         text.textTyped("\n", false);
+    } else if (state.undo) {
+        const cursorPos = text.textLayout.selection.cursor;
+        const offset = 1;
+        var startPoint = cursorPos;
+        if (startPoint == 0) return;
+        var endPoint = if (startPoint > offset) startPoint - offset else 0;
+
+        //ensure a spcae is left if starting at the next word
+        if (text_entry_buf.items[startPoint - 1] == ' ') {
+            startPoint = if (startPoint > 1) startPoint - 1 else return;
+            endPoint = if (endPoint > 1) endPoint - 1 else return;
+        }
+
+        while (endPoint > 0 and text_entry_buf.items[endPoint] != ' ') {
+            endPoint -= 1;
+        }
+
+        const len = startPoint - endPoint;
+        try text_entry_buf.replaceRange(gpa, endPoint, len, &[_]u8{});
+        text.textSet(text_entry_buf.items, false);
+        text.textLayout.selection.cursor = cursorPos - len;
     }
 }
 
@@ -197,6 +229,7 @@ fn clearInputState(state: *inputState) void {
     state.save = false;
     state.saveAs = false;
     state.newLine = false;
+    state.undo = false;
 }
 
 ///determines what events have occurred this frame
@@ -211,6 +244,8 @@ fn poolEvents(state: *inputState) !bool {
                     state.load = true;
                 } else if (e.evt.key.code == .s) {
                     state.save = true;
+                } else if (e.evt.key.code == .z) {
+                    state.undo = true;
                 }
             } else if (e.evt.key.action == .down and (e.evt.key.code == .enter or e.evt.key.code == .kp_enter)) {
                 state.newLine = true;
