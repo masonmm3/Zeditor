@@ -16,6 +16,7 @@ var show_dialog_outside_frame: bool = false;
 
 //Custom Globally scoped values
 var text_entry_buf: std.ArrayList(u8) = .empty;
+var redo_buf: std.ArrayList(removedSection) = .empty;
 
 var startSize: usize = 1;
 
@@ -27,12 +28,20 @@ const inputState = struct {
     saveAs: bool = false,
     newLine: bool = false,
     undo: bool = false,
+    redo: bool = false,
+};
+
+const removedSection = struct {
+    text: []u8,
+    index: usize = 0,
 };
 //
 
 pub fn main() !void {
     try text_entry_buf.resize(gpa, startSize);
     defer text_entry_buf.deinit(gpa);
+    try redo_buf.resize(gpa, 0);
+    defer redo_buf.deinit(gpa);
 
     if (@import("builtin").os.tag == .windows) {
         dvui.Backend.Common.windowsAttachConsole() catch {};
@@ -172,6 +181,11 @@ fn runToolBar(state: *inputState) void {
             m.close();
             state.undo = true;
         }
+
+        if (dvui.menuItemLabel(@src(), "Redo", .{}, .{ .style = .window }) != null) {
+            m.close();
+            state.redo = true;
+        }
     }
 }
 
@@ -207,9 +221,22 @@ fn typingEvents(state: *inputState, text: *dvui.TextEntryWidget) !void {
         }
 
         const len = startPoint - endPoint;
+        const removed = text_entry_buf.items[endPoint..startPoint];
+        const removedCopy = try gpa.dupe(u8, removed);
+        try redo_buf.append(gpa, removedSection{ .text = removedCopy, .index = endPoint });
         try text_entry_buf.replaceRange(gpa, endPoint, len, &[_]u8{});
         text.textSet(text_entry_buf.items, false);
         text.textLayout.selection.cursor = cursorPos - len;
+    } else if (state.redo) {
+        if (redo_buf.pop()) |last_action| {
+            try text_entry_buf.insertSlice(gpa, last_action.index, last_action.text);
+
+            text.textSet(text_entry_buf.items, false);
+
+            text.textLayout.selection.cursor = last_action.index + last_action.text.len;
+
+            gpa.free(last_action.text);
+        }
     }
 }
 
@@ -230,6 +257,7 @@ fn clearInputState(state: *inputState) void {
     state.saveAs = false;
     state.newLine = false;
     state.undo = false;
+    state.redo = false;
 }
 
 ///determines what events have occurred this frame
@@ -246,6 +274,8 @@ fn poolEvents(state: *inputState) !bool {
                     state.save = true;
                 } else if (e.evt.key.code == .z) {
                     state.undo = true;
+                } else if (e.evt.key.code == .y) {
+                    state.redo = true;
                 }
             } else if (e.evt.key.action == .down and (e.evt.key.code == .enter or e.evt.key.code == .kp_enter)) {
                 state.newLine = true;
