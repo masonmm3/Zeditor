@@ -227,10 +227,20 @@ pub const zeditor = struct {
         if (fileName) |fname| {
             const file = try std.fs.openFileAbsolute(fname, .{ .mode = .read_only });
             defer file.close();
-            const size = try file.getEndPos();
-            _ = try self.text_entry_buf.resize(self.gpa, size);
-            const bytes = try file.readAll(self.text_entry_buf.items);
-            _ = try self.text_entry_buf.resize(self.gpa, bytes);
+
+            const raw_content = try file.readToEndAlloc(self.gpa, std.math.maxInt(usize));
+            defer self.gpa.free(raw_content);
+
+            self.text_entry_buf.clearRetainingCapacity();
+
+            for (raw_content) |char| {
+                switch (char) {
+                    '\t' => try self.text_entry_buf.appendSlice(self.gpa, "    "),
+                    '\r' => continue,
+                    else => try self.text_entry_buf.append(self.gpa, char),
+                }
+            }
+
             self.open_file_name = fname;
         }
     }
