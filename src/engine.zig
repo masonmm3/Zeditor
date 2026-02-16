@@ -8,7 +8,7 @@ var scale_val: f32 = 1.0;
 var show_dialog_outside_frame: bool = false;
 const window_icon_png = @embedFile("resources/zig-favicon.png");
 
-pub fn runApp(frame: fn () anyerror!bool, gpa: anytype) !void {
+pub fn runApp(frame: fn () anyerror!bool, gpa: std.mem.Allocator) !void {
     if (@import("builtin").os.tag == .windows) {
         dvui.Backend.Common.windowsAttachConsole() catch {};
     }
