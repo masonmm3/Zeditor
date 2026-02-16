@@ -11,6 +11,15 @@ pub fn build(b: *std.Build) !void {
 
     const name = "Zeditor";
 
+    const engine = b.createModule(.{
+        .root_source_file = b.path("src/engine.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    engine.addImport("dvui", dvui_dep.module("dvui_sdl3gpu"));
+    engine.addImport("sdl3gpu-backend", dvui_dep.module("sdl3"));
+
     const exe_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
@@ -26,6 +35,7 @@ pub fn build(b: *std.Build) !void {
 
     exe.root_module.addImport("dvui", dvui_dep.module("dvui_sdl3gpu"));
     exe.root_module.addImport("sdl3gpu-backend", dvui_dep.module("sdl3"));
+    exe.root_module.addImport("engine", engine);
 
     const compile_step = b.step("compile", "Compile " ++ name);
     compile_step.dependOn(&b.addInstallArtifact(exe, .{}).step);
