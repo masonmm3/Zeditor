@@ -24,7 +24,7 @@ pub const zeditor = struct {
         return self;
     }
 
-    /// deinits the internal objects
+    /// de inits the internal objects
     pub fn deinit(self: *zeditor) void {
         self.text_entry_buf.deinit(self.gpa);
         self.redo_buf.deinit(self.gpa);
@@ -108,7 +108,7 @@ pub const zeditor = struct {
             if (startPoint == 0) return;
             var endPoint = if (startPoint > offset) startPoint - offset else 0;
 
-            //ensure a spcae is left if starting at the next word
+            //ensure a space is left if starting at the next word
             if (self.text_entry_buf.items[startPoint - 1] == ' ') {
                 startPoint = if (startPoint > 1) startPoint - 1 else return;
                 endPoint = if (endPoint > 1) endPoint - 1 else return;
